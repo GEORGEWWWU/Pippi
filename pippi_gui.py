@@ -142,7 +142,6 @@ class PippiGUI:
             logo_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico"
             )
-            print(f"尝试加载logo: {logo_path}")  # 调试信息
             if os.path.exists(logo_path):
                 # 使用PIL加载并调整图标大小
                 logo_image = Image.open(logo_path)
@@ -152,7 +151,6 @@ class PippiGUI:
                 logo_label = tk.Label(title_frame, image=logo_photo, bg=self.bg_color)
                 logo_label.image = logo_photo  # 保持引用
                 logo_label.pack(pady=(0, 10))
-                print("Logo加载成功")  # 调试信息
             else:
                 raise FileNotFoundError("Logo文件不存在")
         except ImportError:
@@ -386,7 +384,6 @@ def main():
     # 使用实际设置的窗口尺寸，而不是请求尺寸
     # 从geometry字符串中提取宽度和高度
     geometry = root.geometry()
-    print(f"初始几何信息: {geometry}")  # 调试信息
     
     if 'x' in geometry:
         # 从"700x600+0+0"格式中提取宽度和高度
@@ -406,17 +403,12 @@ def main():
     x = (screen_width // 2) - (width // 2)
     y = (screen_height // 2) - (height // 2) - (taskbar_height // 2)
     
-    # 调试信息
-    print(f"屏幕尺寸: {screen_width}x{screen_height}")
-    print(f"窗口尺寸: {width}x{height}")
-    print(f"计算位置: ({x}, {y})")
     
     # 设置窗口位置（保持原有尺寸）
     root.geometry(f"{width}x{height}+{x}+{y}")
     
     # 验证设置后的几何信息
     final_geometry = root.geometry()
-    print(f"最终几何信息: {final_geometry}")  # 调试信息
     
     # 现在显示窗口
     root.deiconify()
