@@ -106,8 +106,8 @@ class SpiderThread(threading.Thread):
 class PippiGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("皮皮蛛 PippiSpider 1.0")
-        self.root.geometry("700x600")
+        self.root.title("皮皮蛛 PippiSpider 1.2.1")
+        self.root.geometry("700x650")
         self.root.minsize(600, 500)
 
         # 先隐藏窗口，避免闪烁
@@ -115,9 +115,15 @@ class PippiGUI:
 
         # 设置窗口图标
         try:
-            icon_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico"
-            )
+            # 获取资源文件的正确路径（兼容开发环境和打包后的exe）
+            if getattr(sys, "frozen", False):
+                # 打包后的exe环境
+                base_path = sys._MEIPASS
+            else:
+                # 开发环境
+                base_path = os.path.dirname(os.path.abspath(__file__))
+
+            icon_path = os.path.join(base_path, "Pippi-logo.ico")
             self.root.iconbitmap(icon_path)
         except Exception as e:
             print(f"无法加载图标: {e}")
@@ -139,9 +145,15 @@ class PippiGUI:
         try:
             from PIL import Image, ImageTk
 
-            logo_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico"
-            )
+            # 获取资源文件的正确路径（兼容开发环境和打包后的exe）
+            if getattr(sys, "frozen", False):
+                # 打包后的exe环境
+                base_path = sys._MEIPASS
+            else:
+                # 开发环境
+                base_path = os.path.dirname(os.path.abspath(__file__))
+
+            logo_path = os.path.join(base_path, "Pippi-logo.ico")
             if os.path.exists(logo_path):
                 # 使用PIL加载并调整图标大小
                 logo_image = Image.open(logo_path)
@@ -292,10 +304,26 @@ class PippiGUI:
             fg="#333",
             padx=10,
             pady=10,
-            height=10,  # 限制高度为10行
+            height=8,  # 限制高度为8行，为状态栏留出空间
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.log_text.config(state=tk.DISABLED)
+
+        # === 状态栏 ===
+        status_frame = tk.Frame(main_frame, bg=self.bg_color, height=25)
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(5, 0))
+        status_frame.pack_propagate(False)  # 防止子组件改变框架大小
+
+        # 版本和作者信息（左侧）
+        version_label = tk.Label(
+            status_frame,
+            text="版本 1.2.1 - 作者: GEORGEWU",
+            bg=self.bg_color,
+            fg="#666666",
+            font=("Microsoft YaHei", 8),
+            anchor=tk.W,
+        )
+        version_label.pack(side=tk.LEFT, padx=(5, 0))
 
         self.thread = None
 
@@ -375,44 +403,43 @@ class PippiGUI:
 def main():
     root = tk.Tk()
     root.withdraw()  # 先隐藏窗口，避免显示在默认位置
-    
+
     app = PippiGUI(root)
-    
+
     # 计算窗口居中位置
     root.update_idletasks()  # 确保窗口已经更新
-    
+
     # 使用实际设置的窗口尺寸，而不是请求尺寸
     # 从geometry字符串中提取宽度和高度
     geometry = root.geometry()
-    
-    if 'x' in geometry:
+
+    if "x" in geometry:
         # 从"700x600+0+0"格式中提取宽度和高度
-        size_part = geometry.split('+')[0]  # 取"700x600"部分
-        width, height = map(int, size_part.split('x'))  # 分割为700和600
+        size_part = geometry.split("+")[0]  # 取"700x600"部分
+        width, height = map(int, size_part.split("x"))  # 分割为700和600
     else:
         # 如果解析失败，使用默认值
         width, height = 700, 600
-    
+
     # 获取屏幕尺寸
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
-    
+
     # 计算居中位置 - 考虑到Windows任务栏和可能的边框
     # 通常Windows任务栏在底部，占约40像素高度
     taskbar_height = 40
     x = (screen_width // 2) - (width // 2)
     y = (screen_height // 2) - (height // 2) - (taskbar_height // 2)
-    
-    
+
     # 设置窗口位置（保持原有尺寸）
     root.geometry(f"{width}x{height}+{x}+{y}")
-    
+
     # 验证设置后的几何信息
     final_geometry = root.geometry()
-    
+
     # 现在显示窗口
     root.deiconify()
-    
+
     root.mainloop()
 
 

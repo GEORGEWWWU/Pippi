@@ -13,6 +13,7 @@
 - 📊 **实时进度** - 可视化进度条和详细日志显示
 - 🛡️ **智能反爬** - 动态延迟、User-Agent轮换、请求频率控制
 - 🎯 **万能提取** - 支持任意格式（JPG/PNG/WEBP/GIF等），不限于特定前缀
+- 🔗 **直接链接** - 支持直接输入图片URL进行单张下载
 - 📁 **智能命名** - 自动保留原始文件名，自动清理非法字符
 - 🔧 **零配置** - 开箱即用，无需修改代码
 - ⏹️ **可控停止** - 随时中断下载，不会损坏已下载文件
@@ -20,14 +21,16 @@
 ## 📦 安装依赖
 
 ```bash
-pip install requests beautifulsoup4
+pip install requests beautifulsoup4 pillow
 ```
 
-> **注意**: tkinter 通常随 Python 一起安装，如果没有，请根据你的系统安装：
-> - Ubuntu/Debian: `sudo apt-get install python3-tk`
-> - Fedora: `sudo dnf install python3-tkinter`
-> - macOS: tkinter 通常已包含在 Python 中
-> - Windows: tkinter 通常已包含在 Python 中
+> **注意**: 
+> - tkinter 通常随 Python 一起安装，如果没有，请根据你的系统安装：
+>   - Ubuntu/Debian: `sudo apt-get install python3-tk`
+>   - Fedora: `sudo dnf install python3-tkinter`
+>   - macOS: tkinter 通常已包含在 Python 中
+>   - Windows: tkinter 通常已包含在 Python 中
+> - pillow 用于GUI界面中的图标显示，如果没有安装，程序会使用emoji替代图标
 
 ## 🚀 快速开始
 
@@ -39,11 +42,21 @@ python pippi_gui.py
 
 ### 使用流程
 
-1. **输入目标链接** - 在GUI界面中输入要爬取的页面URL
+1. **输入目标链接** - 在GUI界面中输入要爬取的页面URL或直接图片链接
 2. **选择保存目录** - 设置图片保存的文件夹位置
 3. **开始下载** - 点击"开始下载"按钮启动爬虫
 4. **监控进度** - 实时查看下载进度和日志信息
 5. **随时停止** - 如需中断可点击"停止"按钮
+
+### 支持的链接类型
+
+1. **网页链接** - 包含图片的网页URL，程序会自动提取所有图片
+   - 示例：`https://bing.fullpx.com/`
+   - 示例：`https://www.pixiv.net/artworks/12345678`
+
+2. **直接图片链接** - 以图片扩展名结尾的直接URL
+   - 示例：`https://example.com/photo.jpg`
+   - 示例：`https://i.pximg.net/img-original/img/2023/01/01/00/00/00/12345678_p0.png`
 
 ### GUI界面功能
 
@@ -93,6 +106,20 @@ python pippi_gui.py
 | `min_delay` | float | `1.5` | 最小请求延迟(秒) |
 | `max_delay` | float | `5.0` | 最大请求延迟(秒) |
 | `retries` | int | `3` | 失败重试次数 |
+| `pixiv_cookie` | str | `"PHPSESSID=88843137_JNDfSY4N0W1gND6Hu4Iuq3qCO2pFzRh3"` | Pixiv登录凭证，用于下载高清原图 |
+
+### Pixiv配置
+
+要下载Pixiv的高清原图，需要配置Pixiv的PHPSESSID：
+
+1. 登录Pixiv网站
+2. 打开浏览器开发者工具(F12)
+3. 在Network标签中找到任意请求
+4. 在Request Headers中找到Cookie字段
+5. 复制其中的`PHPSESSID=xxxxx`部分
+6. 在`pippi_core.py`中更新`pixiv_cookie`变量
+
+> **注意**: 配置Pixiv Cookie仅用于获取高清原图，不配置也能下载，但可能只能获取缩略图
 
 ## 🛡️ 反爬策略
 
@@ -108,12 +135,26 @@ python pippi_gui.py
 
 | 优先级 | 方法 | 说明 |
 |--------|------|------|
-| 1 | 通用正则 | 匹配所有常见图片格式链接 |
-| 2 | CDN专用正则 | 针对acg.lol等特定CDN优化 |
-| 3 | BeautifulSoup | 解析懒加载、data-src等属性 |
+| 1 | Pixiv API | 针对Pixiv网站，调用Ajax API获取高清原图 |
+| 2 | 通用正则 | 匹配所有常见图片格式链接 |
+| 3 | BeautifulSoup | 解析img标签、data-src等属性 |
 | 4 | 懒加载正则 | 匹配背景图、延迟加载图片 |
 
-支持的格式：`.jpg` `.jpeg` `.png` `.webp` `.gif` `.bmp` `.tiff`
+支持的格式：`.jpg` `.jpeg` `.png` `.webp` `.gif` `.bmp` `.tiff` `.avif`
+
+### Pixiv特殊处理
+
+Pixiv网站采用专门的API获取方式：
+
+1. **自动识别** - 检测URL中是否包含`pixiv.net`或`pximg.net`
+2. **提取ID** - 从URL中提取作品ID（artworks/12345或illust_id=12345）
+3. **调用API** - 使用Ajax API获取高清原图链接
+4. **回退机制** - API失败时自动回退到HTML解析
+
+Pixiv API返回的图片质量优先级：
+1. `original_pic_url` - 最高质量原图
+2. `original` - 原始尺寸
+3. `regular` - 常规尺寸
 
 ## 📁 项目结构
 
@@ -122,6 +163,7 @@ pippi-spider/
 ├── pippi_gui.py       # GUI界面程序
 ├── pippi_core.py      # 核心爬虫类
 ├── README.md          # 本文件
+├── Pippi-logo.ico     # 应用程序图标
 └── pippi_images/      # 默认下载目录
     ├── photo_01.png
     ├── img_0001_a3f7.jpg
@@ -132,6 +174,7 @@ pippi-spider/
 
 - **pippi_gui.py** - 基于tkinter的图形用户界面，提供友好的交互体验
 - **pippi_core.py** - 爬虫核心功能，包含图片提取、下载、反爬策略等
+- **Pippi-logo.ico** - 应用程序图标，用于GUI界面显示
 
 ## 🎮 运行示例
 

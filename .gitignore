@@ -10,6 +10,11 @@ env/
 env*/
 
 
+# 打包文件与版本信息
+*.spec
+version_info.txt
+
+
 # 自定义目录（根据项目实际情况调整）
 pippi_images/
 
