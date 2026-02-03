@@ -107,8 +107,8 @@ class PippiGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("皮皮蛛 PippiSpider 1.0")
-        self.root.geometry("700x500")
-        self.root.minsize(600, 400)
+        self.root.geometry("700x600")
+        self.root.minsize(600, 500)
 
         # 先隐藏窗口，避免闪烁
         self.root.withdraw()
@@ -135,13 +135,68 @@ class PippiGUI:
         title_frame = tk.Frame(main_frame, bg=self.bg_color)
         title_frame.pack(fill=tk.X, pady=(0, 20))
 
-        self.title_label = tk.Label(
+        # Logo
+        try:
+            from PIL import Image, ImageTk
+
+            logo_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico"
+            )
+            print(f"尝试加载logo: {logo_path}")  # 调试信息
+            if os.path.exists(logo_path):
+                # 使用PIL加载并调整图标大小
+                logo_image = Image.open(logo_path)
+                logo_image = logo_image.resize((64, 64), Image.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(logo_image)
+
+                logo_label = tk.Label(title_frame, image=logo_photo, bg=self.bg_color)
+                logo_label.image = logo_photo  # 保持引用
+                logo_label.pack(pady=(0, 10))
+                print("Logo加载成功")  # 调试信息
+            else:
+                raise FileNotFoundError("Logo文件不存在")
+        except ImportError:
+            # 如果没有安装PIL，使用简单的文本替代
+            print("未安装PIL，使用emoji替代")  # 调试信息
+            logo_label = tk.Label(
+                title_frame,
+                text="🕷️",
+                font=("Arial", 48),
+                bg=self.bg_color,
+                fg="#4CAF50",
+            )
+            logo_label.pack(pady=(0, 10))
+        except Exception as e:
+            # 如果加载图标失败，使用简单的文本替代
+            print(f"Logo加载失败: {e}")  # 调试信息
+            logo_label = tk.Label(
+                title_frame,
+                text="🕷️",
+                font=("Arial", 48),
+                bg=self.bg_color,
+                fg="#4CAF50",
+            )
+            logo_label.pack(pady=(0, 10))
+
+        # 大标题
+        title_label = tk.Label(
             title_frame,
-            text="皮皮蛛 PippiSpider 1.0",
+            text="皮皮蛛图片下载器",
+            font=("Microsoft YaHei", 24, "bold"),
             bg=self.bg_color,
-            font=("Microsoft YaHei", 16, "bold"),
+            fg="#333333",
         )
-        self.title_label.pack()
+        title_label.pack()
+
+        # 副标题
+        subtitle_label = tk.Label(
+            title_frame,
+            text="一只懂得休息、会跳过已下载、绝不给主人添麻烦的乖蜘蛛",
+            font=("Microsoft YaHei", 10),
+            bg=self.bg_color,
+            fg="#666666",
+        )
+        subtitle_label.pack(pady=(5, 0))
 
         # === 输入区域 ===
         input_frame = tk.LabelFrame(
@@ -239,6 +294,7 @@ class PippiGUI:
             fg="#333",
             padx=10,
             pady=10,
+            height=10,  # 限制高度为10行
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.log_text.config(state=tk.DISABLED)
@@ -320,19 +376,51 @@ class PippiGUI:
 
 def main():
     root = tk.Tk()
+    root.withdraw()  # 先隐藏窗口，避免显示在默认位置
+    
     app = PippiGUI(root)
-
+    
     # 计算窗口居中位置
     root.update_idletasks()  # 确保窗口已经更新
-    width = root.winfo_reqwidth()  # 使用reqwidth获取所需宽度
-    height = root.winfo_reqheight()  # 使用reqheight获取所需高度
-    x = (root.winfo_screenwidth() // 2) - (width // 2)
-    y = (root.winfo_screenheight() // 2) - (height // 2)
+    
+    # 使用实际设置的窗口尺寸，而不是请求尺寸
+    # 从geometry字符串中提取宽度和高度
+    geometry = root.geometry()
+    print(f"初始几何信息: {geometry}")  # 调试信息
+    
+    if 'x' in geometry:
+        # 从"700x600+0+0"格式中提取宽度和高度
+        size_part = geometry.split('+')[0]  # 取"700x600"部分
+        width, height = map(int, size_part.split('x'))  # 分割为700和600
+    else:
+        # 如果解析失败，使用默认值
+        width, height = 700, 600
+    
+    # 获取屏幕尺寸
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    
+    # 计算居中位置 - 考虑到Windows任务栏和可能的边框
+    # 通常Windows任务栏在底部，占约40像素高度
+    taskbar_height = 40
+    x = (screen_width // 2) - (width // 2)
+    y = (screen_height // 2) - (height // 2) - (taskbar_height // 2)
+    
+    # 调试信息
+    print(f"屏幕尺寸: {screen_width}x{screen_height}")
+    print(f"窗口尺寸: {width}x{height}")
+    print(f"计算位置: ({x}, {y})")
+    
+    # 设置窗口位置（保持原有尺寸）
     root.geometry(f"{width}x{height}+{x}+{y}")
-
+    
+    # 验证设置后的几何信息
+    final_geometry = root.geometry()
+    print(f"最终几何信息: {final_geometry}")  # 调试信息
+    
     # 现在显示窗口
     root.deiconify()
-
+    
     root.mainloop()
 
 
