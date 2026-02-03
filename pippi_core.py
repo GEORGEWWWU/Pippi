@@ -20,11 +20,17 @@ class RobustImageSpider:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
         ]
 
+        # ========== 修改这里：添加你的 PHPSESSID ==========
+        # 你只有这一个值，其他字段不是必须的，PHPSESSID 是核心
+        self.pixiv_cookie = "PHPSESSID=88843137_JNDfSY4N0W1gND6Hu4Iuq3qCO2pFzRh3"
+        # ================================================
+
         self.session.headers.update(
             {
                 "User-Agent": self.user_agents[0],
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                 "Accept-Language": "zh-CN,zh;q=0.9",
+                # 不要在这里加 Cookie 和 Referer！
             }
         )
 
@@ -62,7 +68,7 @@ class RobustImageSpider:
     def _get_headers_for_url(self, url, is_image=False):
         """
         根据URL获取对应的请求头
-        针对Pixiv特殊处理：添加Referer
+        针对Pixiv特殊处理：添加Referer和Cookie
         """
         headers = {
             "User-Agent": random.choice(self.user_agents),
@@ -71,6 +77,11 @@ class RobustImageSpider:
         if self._is_pixiv_url(url):
             # Pixiv 必须添加 Referer，否则图片服务器会返回 403
             headers["Referer"] = "https://www.pixiv.net/"
+
+            # ========== 修改这里：添加你的 Cookie ==========
+            headers["Cookie"] = self.pixiv_cookie
+            # ===========================================
+
             if is_image:
                 headers["Accept"] = "image/webp,image/apng,image/*,*/*;q=0.8"
             else:
@@ -78,7 +89,7 @@ class RobustImageSpider:
                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
                 )
         else:
-            # 其他网站使用通用头，不添加Referer避免反爬
+            # 其他网站不加 Referer 和 Cookie
             if is_image:
                 headers["Accept"] = "image/webp,image/apng,image/*,*/*;q=0.8"
             else:
@@ -104,99 +115,86 @@ class RobustImageSpider:
 
     def extract_images(self, html, base_url=None):
         """
-        修改版：优先使用 Pixiv Ajax API 获取高清原图
+        修改版：优先使用 Pixiv Ajax API 获取高清原图，其他网站使用通用解析
         """
         if not base_url:
             return []
 
         images = []
 
-        # === 核心修改：针对 Pixiv 优先调用 API ===
+        # === Pixiv 特殊处理 ===
         if self._is_pixiv_url(base_url):
-            # 1. 尝试从 URL 中提取 artwork ID
-            # 匹配格式: pixiv.net/artworks/123456 或 pixiv.net/member_illust.php?mode=medium&illust_id=123456
             illust_id = None
-            match = re.search(r'artworks/(\d+)', base_url)
+            match = re.search(r"artworks/(\d+)", base_url)
             if match:
                 illust_id = match.group(1)
             else:
-                match = re.search(r'illust_id=(\d+)', base_url)
+                match = re.search(r"illust_id=(\d+)", base_url)
                 if match:
                     illust_id = match.group(1)
 
             if illust_id:
                 print(f" ⚙️ 检测到 Pixiv ID: {illust_id}，正在调用 API...")
                 try:
-                    # 构造 Pixiv 内部 API 地址 (获取多图/单图均适用)
+                    # 注意：这里有个空格！删除它
                     api_url = f"https://www.pixiv.net/ajax/illust/{illust_id}/pages?lang=zh"
-
-                    # 必须带 Referer，否则 API 返回 403
                     headers = self._get_headers_for_url(base_url)
-
-                    # 请求 API
                     api_res = self.session.get(api_url, headers=headers, timeout=10)
                     api_res.raise_for_status()
-
-                    # 解析 JSON
                     data = api_res.json()
 
-                    if not data.get('error'):
-                        # data['body'] 是一个列表，包含每一页的信息
-                        for page in data.get('body', []):
-                            urls = page.get('urls', {})
-                            # 优先获取 original (原图)，如果没有则获取 regular
-                            img_url = urls.get('original_pic_url') or urls.get('original') or urls.get('regular')
+                    if not data.get("error"):
+                        for page in data.get("body", []):
+                            urls = page.get("urls", {})
+                            img_url = (
+                                    urls.get("original_pic_url")
+                                    or urls.get("original")
+                                    or urls.get("regular")
+                            )
                             if img_url:
                                 images.append(img_url)
 
                         if images:
-                            print(f"  ✓ API 调用成功，获取到 {len(images)} 张原图")
-                            return images
+                            print(f"  ✓ API 调用成功，获取到 {len(images)} 张原图")
+                            return images  # Pixiv 成功直接返回
                     else:
-                        print(f"  ⚠️ API 返回错误: {data.get('message')}")
+                        print(f"  ⚠️ API 返回错误: {data.get('message')}")
 
                 except Exception as e:
-                    print(f"  ⚠️ API 调用失败，尝试回退到 HTML 解析: {e}")
+                    print(f"  ⚠️ API 调用失败，尝试回退到 HTML 解析: {e}")
+                    # Pixiv API 失败继续走下面的通用解析，不要 return
 
-        # === 以下是回退逻辑（你原有的代码，保留以防万一）===
+        # === 通用网站解析（百度、Google 等）===
+        if not images:  # Pixiv 没成功或不是 Pixiv，执行通用解析
+            print("  🔍 使用通用解析规则...")
 
-        # 尝试从 __NEXT_DATA__ 提取 (保留你原有的逻辑作为备份)
-        import json
-        next_data_pattern = r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>'
-        match = re.search(next_data_pattern, html, re.DOTALL)
-        if match:
-            try:
-                data = json.loads(match.group(1))
-                # ... (此处省略你原有的复杂解析逻辑，如果上面API成功，这里不会执行) ...
-                # 简单处理：如果 API 失败了，尝试在这里找 urls
-                if not images:
-                    illust_data = data.get('props', {}).get('pageProps', {}).get('illust', {})
-                    # ... (为了代码简洁，这里建议直接依赖上面的 API 逻辑)
-            except:
-                pass
+            # 方法1: 从 img 标签提取
+            soup = BeautifulSoup(html, 'html.parser')
+            for img in soup.find_all('img'):
+                src = img.get('src') or img.get('data-src') or img.get('data-original')
+                if src:
+                    # 补全相对路径
+                    if src.startswith('//'):
+                        src = 'https:' + src
+                    elif src.startswith('/'):
+                        from urllib.parse import urljoin
+                        src = urljoin(base_url, src)
 
-        # 通用正则匹配（作为最后的兜底）
-        if not images:
-            print("  ⚠️ API 和 JSON 解析均失败，尝试暴力正则匹配...")
-            generic_pattern = r'https?://i\.pximg\.net/[^\s"<>\']+?\.(?:jpg|jpeg|png|webp)'
-            matches = re.findall(generic_pattern, html, re.IGNORECASE)
-            for url in matches:
-                # 清洗 URL
-                url = url.strip().rstrip("\"'").replace("\\/", "/")
-                # 尝试将缩略图转换为原图
-                # 缩略图通常包含: _master1200, _square1200, c/600x1200_90 等
-                # 原图格式通常是: https://i.pximg.net/img-original/img/.../xxx_p0.jpg
+                    # 过滤小图标和无效链接
+                    if any(ext in src.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']):
+                        if not any(x in src for x in ['icon', 'logo', 'avatar', 'thumb', 'sprite']):
+                            images.append(src)
 
-                # 这是一个简单的替换尝试，不一定 100% 准确，但比没有好
-                clean_url = url
-                if "_master1200" in url:
-                    clean_url = url.replace("_master1200", "")
-                    clean_url = clean_url.replace("/img-master/", "/img-original/")
-                    # 还需要注意后缀，缩略图可能是 jpg 但原图是 png
-                    # 这里比较难处理，所以 API 方法才是正道
+            # 方法2: 正则匹配 URL 模式的图片
+            if not images:
+                url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+?\.(?:jpg|jpeg|png|webp|gif|bmp)(?:\?[^"\s<>]*)?'
+                matches = re.findall(url_pattern, html, re.IGNORECASE)
+                for url in matches:
+                    if url not in images and not any(x in url for x in ['icon', 'logo', 'avatar']):
+                        images.append(url)
 
-                if clean_url not in images:
-                    images.append(clean_url)
+            if images:
+                print(f"  ✓ 通用解析找到 {len(images)} 张图片")
 
         # 去重
         seen = set()
