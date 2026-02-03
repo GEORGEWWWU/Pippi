@@ -88,9 +88,16 @@ class SpiderThread(threading.Thread):
 class PippiGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("🕷️ 皮皮蛛图片下载器")
+        self.root.title("皮皮蛛 PippiSpider 1.0")
         self.root.geometry("700x500")
         self.root.minsize(600, 400)
+        
+        # 设置窗口图标
+        try:
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico")
+            self.root.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"无法加载图标: {e}")
 
         # 样式配置
         self.bg_color = "#f0f0f0"
