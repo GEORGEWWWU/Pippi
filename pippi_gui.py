@@ -23,10 +23,11 @@ class SpiderThread(threading.Thread):
     def run(self):
         try:
             import builtins
+
             original_print = builtins.print
 
             def gui_print(*args, **kwargs):
-                msg = ' '.join(map(str, args))
+                msg = " ".join(map(str, args))
                 self.gui.log(msg)
 
             builtins.print = gui_print
@@ -39,6 +40,21 @@ class SpiderThread(threading.Thread):
             def crawl_with_progress(url):
                 self.gui.log(f"🚀 开始爬取: {url}")
 
+                # 检查是否是直接的图片链接
+                if self.spider._is_direct_image_url(url):
+                    self.gui.log("🎯 检测到直接图片链接，开始下载...")
+                    self.gui.set_progress(0, 1)
+                    self.spider.download_image(url, 1)
+                    self.gui.set_progress(1, 1)
+                    success = self.spider.downloaded_count
+                    skipped = self.spider.skipped_count
+                    failed = self.spider.failed_count
+                    self.gui.log(
+                        f"✅ 下载完成！成功: {success}, 跳过: {skipped}, 失败: {failed}"
+                    )
+                    return success
+
+                # 原有逻辑：从HTML页面提取图片链接
                 html = self.spider.get_page(url)
                 if not html:
                     self.gui.log("❌ 获取页面失败")
@@ -68,7 +84,9 @@ class SpiderThread(threading.Thread):
                 success = self.spider.downloaded_count
                 skipped = self.spider.skipped_count
                 failed = self.spider.failed_count
-                self.gui.log(f"✅ 下载完成！成功: {success}, 跳过: {skipped}, 失败: {failed}")
+                self.gui.log(
+                    f"✅ 下载完成！成功: {success}, 跳过: {skipped}, 失败: {failed}"
+                )
                 return success
 
             self.spider.crawl = crawl_with_progress
@@ -91,10 +109,15 @@ class PippiGUI:
         self.root.title("皮皮蛛 PippiSpider 1.0")
         self.root.geometry("700x500")
         self.root.minsize(600, 400)
-        
+
+        # 先隐藏窗口，避免闪烁
+        self.root.withdraw()
+
         # 设置窗口图标
         try:
-            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico")
+            icon_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "Pippi-logo.ico"
+            )
             self.root.iconbitmap(icon_path)
         except Exception as e:
             print(f"无法加载图标: {e}")
@@ -108,24 +131,46 @@ class PippiGUI:
         main_frame = tk.Frame(root, bg=self.bg_color, padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
+        # === 标题区域 ===
+        title_frame = tk.Frame(main_frame, bg=self.bg_color)
+        title_frame.pack(fill=tk.X, pady=(0, 20))
+
+        self.title_label = tk.Label(
+            title_frame,
+            text="皮皮蛛 PippiSpider 1.0",
+            bg=self.bg_color,
+            font=("Microsoft YaHei", 16, "bold"),
+        )
+        self.title_label.pack()
+
         # === 输入区域 ===
-        input_frame = tk.LabelFrame(main_frame, text=" 下载设置 ", bg=self.bg_color,
-                                    font=("Microsoft YaHei", 10, "bold"))
+        input_frame = tk.LabelFrame(
+            main_frame,
+            text=" 下载设置 ",
+            bg=self.bg_color,
+            font=("Microsoft YaHei", 10, "bold"),
+        )
         input_frame.pack(fill=tk.X, pady=(0, 10))
 
         # URL输入
-        tk.Label(input_frame, text="目标链接:", bg=self.bg_color).grid(row=0, column=0, sticky=tk.W, pady=5)
+        tk.Label(input_frame, text="目标链接:", bg=self.bg_color).grid(
+            row=0, column=0, sticky=tk.W, pady=5
+        )
         self.url_entry = tk.Entry(input_frame, width=50, font=("Consolas", 10))
         self.url_entry.grid(row=0, column=1, sticky=tk.EW, padx=5)
         self.url_entry.insert(0, "https://bing.fullpx.com/")
 
         # 文件夹选择
-        tk.Label(input_frame, text="保存目录:", bg=self.bg_color).grid(row=1, column=0, sticky=tk.W, pady=5)
+        tk.Label(input_frame, text="保存目录:", bg=self.bg_color).grid(
+            row=1, column=0, sticky=tk.W, pady=5
+        )
         self.folder_entry = tk.Entry(input_frame, width=40, font=("Consolas", 10))
         self.folder_entry.grid(row=1, column=1, sticky=tk.EW, padx=5)
         self.folder_entry.insert(0, "pippi_images")
 
-        self.browse_btn = tk.Button(input_frame, text="浏览...", command=self.browse_folder, bg="#e0e0e0")
+        self.browse_btn = tk.Button(
+            input_frame, text="浏览...", command=self.browse_folder, bg="#e0e0e0"
+        )
         self.browse_btn.grid(row=1, column=2, padx=5)
 
         input_frame.columnconfigure(1, weight=1)
@@ -143,7 +188,7 @@ class PippiGUI:
             font=("Microsoft YaHei", 12, "bold"),
             padx=20,
             pady=5,
-            cursor="hand2"
+            cursor="hand2",
         )
         self.start_btn.pack(side=tk.LEFT, padx=(0, 10))
 
@@ -157,7 +202,7 @@ class PippiGUI:
             padx=20,
             pady=5,
             state=tk.DISABLED,
-            cursor="hand2"
+            cursor="hand2",
         )
         self.stop_btn.pack(side=tk.LEFT)
 
@@ -167,16 +212,23 @@ class PippiGUI:
             main_frame,
             variable=self.progress_var,
             maximum=100,
-            mode='determinate',
-            length=400
+            mode="determinate",
+            length=400,
         )
         self.progress_bar.pack(fill=tk.X, pady=10)
 
-        self.progress_label = tk.Label(main_frame, text="就绪", bg=self.bg_color, fg="gray")
+        self.progress_label = tk.Label(
+            main_frame, text="就绪", bg=self.bg_color, fg="gray"
+        )
         self.progress_label.pack()
 
         # === 日志区域 ===
-        log_frame = tk.LabelFrame(main_frame, text=" 运行日志 ", bg=self.bg_color, font=("Microsoft YaHei", 10, "bold"))
+        log_frame = tk.LabelFrame(
+            main_frame,
+            text=" 运行日志 ",
+            bg=self.bg_color,
+            font=("Microsoft YaHei", 10, "bold"),
+        )
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
 
         self.log_text = scrolledtext.ScrolledText(
@@ -186,7 +238,7 @@ class PippiGUI:
             bg="#fafafa",
             fg="#333",
             padx=10,
-            pady=10
+            pady=10,
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.log_text.config(state=tk.DISABLED)
@@ -211,7 +263,9 @@ class PippiGUI:
         if total > 0:
             percentage = (current / total) * 100
             self.progress_var.set(percentage)
-            self.progress_label.config(text=f"{current}/{total} ({percentage:.1f}%)", fg="blue")
+            self.progress_label.config(
+                text=f"{current}/{total} ({percentage:.1f}%)", fg="blue"
+            )
             self.root.update_idletasks()
 
     def start_download(self):
@@ -226,7 +280,7 @@ class PippiGUI:
             folder = "pippi_images"
             self.folder_entry.insert(0, folder)
 
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(("http://", "https://")):
             messagebox.showwarning("警告", "链接必须以 http:// 或 https:// 开头！")
             return
 
@@ -254,17 +308,31 @@ class PippiGUI:
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
 
+        # 重置进度条和状态标签
+        self.progress_var.set(0)
+        self.progress_label.config(text="就绪", fg="gray")
+
         if success:
-            self.progress_label.config(text="下载完成", fg="green")
             messagebox.showinfo("完成", message)
         else:
-            self.progress_label.config(text="下载失败", fg="red")
             messagebox.showerror("错误", message)
 
 
 def main():
     root = tk.Tk()
     app = PippiGUI(root)
+
+    # 计算窗口居中位置
+    root.update_idletasks()  # 确保窗口已经更新
+    width = root.winfo_reqwidth()  # 使用reqwidth获取所需宽度
+    height = root.winfo_reqheight()  # 使用reqheight获取所需高度
+    x = (root.winfo_screenwidth() // 2) - (width // 2)
+    y = (root.winfo_screenheight() // 2) - (height // 2)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+
+    # 现在显示窗口
+    root.deiconify()
+
     root.mainloop()
 
 
