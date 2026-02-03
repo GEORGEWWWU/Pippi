@@ -1,0 +1,39 @@
+# Python编译生成的字节码文件（核心忽略项）
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python虚拟环境目录（必忽略，避免提交本地环境）
+venv/
+env/
+.venv/
+env*/
+
+
+# 自定义目录（根据项目实际情况调整）
+pippi_images/
+
+
+# 项目依赖清单（按需忽略，若用requirements.txt建议提交，仅忽略缓存）
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# 操作系统相关隐藏文件
+.DS_Store       # MacOS
+Thumbs.db       # Windows
+*.swp           # Vim临时文件
+*.swo           # Vim临时文件
+
+# 日志文件
+*.log
+logs/
+
+# 环境变量配置文件（含敏感信息，必忽略）
+.env
+.env.*
+!.env.example   # 保留示例配置（可选）
+
+# Jupyter Notebook文件
+.ipynb_checkpoints/
