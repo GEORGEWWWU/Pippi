@@ -68,6 +68,10 @@ class RobustImageSpider:
         """检查是否是Photos18相关URL"""
         return "photos18.com" in url.lower()
 
+    def _is_foamgirl_url(self, url):
+        """检查是否是FoamGirl相关URL"""
+        return "foamgirl.net" in url.lower()
+
     def _get_headers_for_url(self, url, is_image=False):
         """
         根据URL获取对应的请求头
@@ -94,9 +98,19 @@ class RobustImageSpider:
         elif self._is_photos18_url(url):
             # Photos18 特殊处理
             headers["Referer"] = "https://www.photos18.com/"
-            
+
             if is_image:
                 headers["Accept"] = "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+            else:
+                headers["Accept"] = (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+                )
+        elif self._is_foamgirl_url(url):
+            # FoamGirl 特殊处理
+            headers["Referer"] = "https://foamgirl.net/"
+
+            if is_image:
+                headers["Accept"] = "image/webp,image/apng,image/*,*/*;q=0.8"
             else:
                 headers["Accept"] = (
                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
@@ -123,7 +137,7 @@ class RobustImageSpider:
             except Exception as e:
                 print(f"  ⚠️ 获取失败 (尝试 {attempt + 1}/{retries}): {str(e)[:50]}")
                 if attempt < retries - 1:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
         return None
 
     def extract_images(self, html, base_url=None):
@@ -138,46 +152,54 @@ class RobustImageSpider:
         # === Photos18.com 特殊处理 ===
         if "photos18.com" in base_url.lower():
             print(" ⚙️ 检测到 Photos18.com，使用特定解析规则...")
-            soup = BeautifulSoup(html, 'html.parser')
-            
+            soup = BeautifulSoup(html, "html.parser")
+
             # 查找所有包含图片的div
-            img_holders = soup.find_all('div', class_='imgHolder')
+            img_holders = soup.find_all("div", class_="imgHolder")
             if not img_holders:
                 # 如果没有找到imgHolder，尝试其他可能的类名
-                img_holders = soup.find_all('div', class_=lambda x: x and 'img' in x.lower())
-            
+                img_holders = soup.find_all(
+                    "div", class_=lambda x: x and "img" in x.lower()
+                )
+
             for holder in img_holders:
                 # 查找img标签
-                img_tag = holder.find('img')
+                img_tag = holder.find("img")
                 if img_tag:
-                    src = img_tag.get('src') or img_tag.get('data-src') or img_tag.get('data-original')
-                    if src and 'photos18.com' in src:
+                    src = (
+                        img_tag.get("src")
+                        or img_tag.get("data-src")
+                        or img_tag.get("data-original")
+                    )
+                    if src and "photos18.com" in src:
                         # 处理URL，确保是完整URL
-                        if src.startswith('//'):
-                            src = 'https:' + src
-                        elif src.startswith('/'):
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        elif src.startswith("/"):
                             from urllib.parse import urljoin
+
                             src = urljoin(base_url, src)
-                        
+
                         # 确保是avif格式
-                        if '.avif' in src:
+                        if ".avif" in src:
                             images.append(src)
-                
+
                 # 也检查a标签的href
-                a_tag = holder.find('a')
+                a_tag = holder.find("a")
                 if a_tag:
-                    href = a_tag.get('href')
-                    if href and 'photos18.com' in href and '.avif' in href:
+                    href = a_tag.get("href")
+                    if href and "photos18.com" in href and ".avif" in href:
                         # 处理URL，确保是完整URL
-                        if href.startswith('//'):
-                            href = 'https:' + href
-                        elif href.startswith('/'):
+                        if href.startswith("//"):
+                            href = "https:" + href
+                        elif href.startswith("/"):
                             from urllib.parse import urljoin
+
                             href = urljoin(base_url, href)
-                        
+
                         if href not in images:
                             images.append(href)
-            
+
             # 如果上面的方法没找到图片，尝试正则匹配
             if not images:
                 # 使用正则表达式匹配photos18.com的avif图片
@@ -186,9 +208,81 @@ class RobustImageSpider:
                 for url in matches:
                     if url not in images:
                         images.append(url)
-            
+
             if images:
                 print(f"  ✓ Photos18.com 解析找到 {len(images)} 张图片")
+                # 去重后返回
+                seen = set()
+                cleaned = []
+                for url in images:
+                    if url and url not in seen:
+                        seen.add(url)
+                        cleaned.append(url)
+                return cleaned
+
+        # === FoamGirl.net 特殊处理 ===
+        if "foamgirl.net" in base_url.lower():
+            print(" ⚙️ 检测到 FoamGirl.net，使用特定解析规则...")
+            soup = BeautifulSoup(html, "html.parser")
+
+            # 查找所有带有 imageclick-imgbox 类的 a 标签
+            img_links = soup.find_all("a", class_="imageclick-imgbox")
+
+            for link in img_links:
+                # 获取 href 属性
+                href = link.get("href")
+                if href and "cdn.foamgirl.net" in href:
+                    # 处理URL，确保是完整URL
+                    if href.startswith("//"):
+                        href = "https:" + href
+                    elif href.startswith("/"):
+                        from urllib.parse import urljoin
+
+                        href = urljoin(base_url, href)
+
+                    # 确保是webp格式
+                    if any(
+                        ext in href.lower()
+                        for ext in [".webp", ".jpg", ".jpeg", ".png"]
+                    ):
+                        images.append(href)
+
+                # 也检查img标签的src
+                img_tag = link.find("img")
+                if img_tag:
+                    src = (
+                        img_tag.get("src")
+                        or img_tag.get("data-src")
+                        or img_tag.get("data-original")
+                    )
+                    if src and "cdn.foamgirl.net" in src:
+                        # 处理URL，确保是完整URL
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        elif src.startswith("/"):
+                            from urllib.parse import urljoin
+
+                            src = urljoin(base_url, src)
+
+                        # 确保是webp格式
+                        if any(
+                            ext in src.lower()
+                            for ext in [".webp", ".jpg", ".jpeg", ".png"]
+                        ):
+                            if src not in images:
+                                images.append(src)
+
+            # 如果上面的方法没找到图片，尝试正则匹配
+            if not images:
+                # 使用正则表达式匹配foamgirl.net的图片
+                pattern = r'https?://cdn\.foamgirl\.net[^\s<>"{}|\\^`\[\]]*?\.(?:webp|jpg|jpeg|png)[^\s<>"{}|\\^`\[\]]*?'
+                matches = re.findall(pattern, html, re.IGNORECASE)
+                for url in matches:
+                    if url not in images:
+                        images.append(url)
+
+            if images:
+                print(f"  ✓ FoamGirl.net 解析找到 {len(images)} 张图片")
                 # 去重后返回
                 seen = set()
                 cleaned = []
@@ -211,7 +305,9 @@ class RobustImageSpider:
                 print(f" ⚙️ 检测到 Pixiv ID: {illust_id}，正在调用 API...")
                 try:
                     # 注意：这里有个空格！删除它
-                    api_url = f"https://www.pixiv.net/ajax/illust/{illust_id}/pages?lang=zh"
+                    api_url = (
+                        f"https://www.pixiv.net/ajax/illust/{illust_id}/pages?lang=zh"
+                    )
                     headers = self._get_headers_for_url(base_url)
                     api_res = self.session.get(api_url, headers=headers, timeout=10)
                     api_res.raise_for_status()
@@ -221,9 +317,9 @@ class RobustImageSpider:
                         for page in data.get("body", []):
                             urls = page.get("urls", {})
                             img_url = (
-                                    urls.get("original_pic_url")
-                                    or urls.get("original")
-                                    or urls.get("regular")
+                                urls.get("original_pic_url")
+                                or urls.get("original")
+                                or urls.get("regular")
                             )
                             if img_url:
                                 images.append(img_url)
@@ -243,20 +339,27 @@ class RobustImageSpider:
             print("  🔍 使用通用解析规则...")
 
             # 方法1: 从 img 标签提取
-            soup = BeautifulSoup(html, 'html.parser')
-            for img in soup.find_all('img'):
-                src = img.get('src') or img.get('data-src') or img.get('data-original')
+            soup = BeautifulSoup(html, "html.parser")
+            for img in soup.find_all("img"):
+                src = img.get("src") or img.get("data-src") or img.get("data-original")
                 if src:
                     # 补全相对路径
-                    if src.startswith('//'):
-                        src = 'https:' + src
-                    elif src.startswith('/'):
+                    if src.startswith("//"):
+                        src = "https:" + src
+                    elif src.startswith("/"):
                         from urllib.parse import urljoin
+
                         src = urljoin(base_url, src)
 
                     # 过滤小图标和无效链接
-                    if any(ext in src.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']):
-                        if not any(x in src for x in ['icon', 'logo', 'avatar', 'thumb', 'sprite']):
+                    if any(
+                        ext in src.lower()
+                        for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"]
+                    ):
+                        if not any(
+                            x in src
+                            for x in ["icon", "logo", "avatar", "thumb", "sprite"]
+                        ):
                             images.append(src)
 
             # 方法2: 正则匹配 URL 模式的图片
@@ -264,7 +367,9 @@ class RobustImageSpider:
                 url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+?\.(?:jpg|jpeg|png|webp|gif|bmp)(?:\?[^"\s<>]*)?'
                 matches = re.findall(url_pattern, html, re.IGNORECASE)
                 for url in matches:
-                    if url not in images and not any(x in url for x in ['icon', 'logo', 'avatar']):
+                    if url not in images and not any(
+                        x in url for x in ["icon", "logo", "avatar"]
+                    ):
                         images.append(url)
 
             if images:
@@ -385,7 +490,7 @@ class RobustImageSpider:
 
             except Exception as e:
                 if attempt < retries - 1:
-                    time.sleep(2 ** attempt + random.uniform(0, 1))
+                    time.sleep(2**attempt + random.uniform(0, 1))
                 else:
                     self.failed_count += 1
                     print(f"  ❌ [{index}] 失败: {str(e)[:40]}")

@@ -106,7 +106,7 @@ class SpiderThread(threading.Thread):
 class PippiGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("皮皮蛛 PippiSpider 1.2.1")
+        self.root.title("皮皮蛛 PippiSpider 1.4.1")
         self.root.geometry("700x650")
         self.root.minsize(600, 500)
 
@@ -317,7 +317,7 @@ class PippiGUI:
         # 版本和作者信息（左侧）
         version_label = tk.Label(
             status_frame,
-            text="版本 1.3.1 - 作者: GEORGEWU",
+            text="版本 1.4.1 - 作者: GEORGEWU",
             bg=self.bg_color,
             fg="#666666",
             font=("Microsoft YaHei", 8),
