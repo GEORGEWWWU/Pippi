@@ -317,7 +317,7 @@ class PippiGUI:
         # 版本和作者信息（左侧）
         version_label = tk.Label(
             status_frame,
-            text="版本 1.2.1 - 作者: GEORGEWU",
+            text="版本 1.3.1 - 作者: GEORGEWU",
             bg=self.bg_color,
             fg="#666666",
             font=("Microsoft YaHei", 8),
